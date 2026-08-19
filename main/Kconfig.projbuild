@@ -1,0 +1,29 @@
+menu "Espisstant configuration"
+
+    config ESPISSTANT_VOICE
+        bool "Enable offline voice control (ESP-SR, needs ESP32-S3)"
+        depends on IDF_TARGET_ESP32S3
+        default y
+        help
+            Wake word ("Hi ESP") + offline English command recognition via
+            Espressif's ESP-SR. Requires an ESP32-S3 with PSRAM and an I2S
+            MEMS microphone. Without it the device is controlled through
+            the web UI / HTTP API only.
+
+    if ESPISSTANT_VOICE
+
+        config ESPISSTANT_MIC_I2S_SCK
+            int "I2S microphone SCK (BCLK) GPIO"
+            default 4
+
+        config ESPISSTANT_MIC_I2S_WS
+            int "I2S microphone WS (LRCLK) GPIO"
+            default 5
+
+        config ESPISSTANT_MIC_I2S_SD
+            int "I2S microphone SD (DATA) GPIO"
+            default 6
+
+    endif
+
+endmenu
