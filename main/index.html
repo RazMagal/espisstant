@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Espisstant</title>
+<style>
+:root{--bg:#101418;--card:#1a2026;--fg:#e6edf3;--mut:#8b98a5;--acc:#4dabf7;--ok:#51cf66;--warn:#ffd43b}
+*{box-sizing:border-box;margin:0}
+body{background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,sans-serif;padding:1rem;max-width:640px;margin:auto}
+h1{font-size:1.3rem;margin:.2rem 0 1rem}h1 small{color:var(--mut);font-weight:400;font-size:.8rem}
+h2{font-size:1rem;margin-bottom:.6rem}
+.card{background:var(--card);border-radius:10px;padding:1rem;margin-bottom:1rem}
+.row{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin:.35rem 0}
+button{background:var(--acc);border:0;border-radius:8px;color:#04121f;padding:.5rem .9rem;font-weight:600;cursor:pointer}
+button.off{background:#37444f;color:var(--fg)}
+button:active{transform:scale(.97)}
+input,select{background:#0d1117;border:1px solid #2c3844;border-radius:8px;color:var(--fg);padding:.45rem .6rem;flex:1;min-width:8rem}
+label{color:var(--mut);min-width:5.5rem}
+.tag{font-size:.75rem;color:var(--mut)}
+.tag b{color:var(--fg)}
+#msg{position:fixed;left:50%;bottom:1rem;transform:translateX(-50%);background:#000c;padding:.5rem 1rem;border-radius:8px;opacity:0;transition:.3s}
+#msg.show{opacity:1}
+.dot{width:.6rem;height:.6rem;border-radius:50%;display:inline-block;background:#555}
+.dot.on{background:var(--ok)}
+</style>
+</head>
+<body>
+<h1>🎙️ Espisstant <small id="mode"></small></h1>
+
+<div class="card">
+  <h2>💡 Lights (Hue)</h2>
+  <div class="row">
+    <button onclick="intent('lights_on')">On</button>
+    <button class="off" onclick="intent('lights_off')">Off</button>
+    <button class="off" onclick="intent('lights_dim')">Dim −</button>
+    <button class="off" onclick="intent('lights_bright')">Bright +</button>
+  </div>
+  <div class="row"><label>Bridge IP</label><input id="hue_ip" placeholder="auto">
+    <button class="off" onclick="hueDiscover()">Find</button></div>
+  <div class="row"><label>Group</label><input id="hue_group" type="number" value="0" style="max-width:5rem">
+    <button class="off" onclick="huePair()">Pair (press link button first)</button></div>
+  <div class="tag" id="hue_state"></div>
+</div>
+
+<div class="card">
+  <h2>🔥 Heater &nbsp;·&nbsp; 🔌 Plug &nbsp;·&nbsp; ❄️ AC (Switcher)</h2>
+  <div class="row"><label>Heater</label>
+    <button onclick="intent('heater_on')">On</button>
+    <button class="off" onclick="intent('heater_off')">Off</button>
+    <span class="tag" id="heater_tag"></span></div>
+  <div class="row"><label>Plug</label>
+    <button onclick="intent('plug_on')">On</button>
+    <button class="off" onclick="intent('plug_off')">Off</button>
+    <span class="tag" id="plug_tag"></span></div>
+  <div class="row"><label>AC</label>
+    <button onclick="intent('ac_on')">On</button>
+    <button class="off" onclick="intent('ac_off')">Off</button>
+    <button class="off" onclick="intent('ac_warmer')">+1°</button>
+    <button class="off" onclick="intent('ac_cooler')">−1°</button>
+    <span class="tag" id="ac_tag"></span></div>
+  <div class="tag" id="seen"></div>
+</div>
+
+<div class="card">
+  <h2>📶 Wi-Fi</h2>
+  <div class="row"><label>Network</label><input id="ssid" placeholder="SSID"></div>
+  <div class="row"><label>Password</label><input id="pass" type="password"></div>
+  <div class="row"><button onclick="saveWifi()">Save &amp; reboot</button></div>
+</div>
+
+<div class="card">
+  <h2>🔐 API token</h2>
+  <div class="row"><label>Token</label>
+    <input id="token" type="password" placeholder="empty = open mode (LAN-trusted)">
+    <button class="off" onclick="saveToken()">Set</button></div>
+  <div class="tag">When set, every control request must send it as
+    <b>X-Api-Key</b>. This browser remembers it locally.</div>
+</div>
+
+<div class="card tag" id="voice"></div>
+<div id="msg"></div>
+
+<script>
+const $=id=>document.getElementById(id);
+function toast(t){$('msg').textContent=t;$('msg').classList.add('show');
+  setTimeout(()=>$('msg').classList.remove('show'),2500)}
+async function post(url,body){
+  const h={'Content-Type':'application/json'};
+  const t=localStorage.getItem('api_token');
+  if(t)h['X-Api-Key']=t;
+  const r=await fetch(url,{method:'POST',headers:h,
+    body:JSON.stringify(body||{})});
+  const j=await r.json().catch(()=>({}));
+  if(r.status===401){
+    const nt=prompt('This device requires an API token:');
+    if(nt){localStorage.setItem('api_token',nt);return post(url,body)}
+  }
+  if(!r.ok)throw j.error||r.statusText;return j}
+async function saveToken(){
+  const t=$('token').value.trim();
+  try{
+    await post('/api/settings',{api_token:t});
+    if(t)localStorage.setItem('api_token',t);
+    else localStorage.removeItem('api_token');
+    toast(t?'token set ✓':'token cleared — open mode');
+  }catch(e){toast('failed: '+e)}}
+async function intent(name){
+  try{await post('/api/intent',{intent:name});toast(name.replace('_',' ')+' ✓')}
+  catch(e){toast('failed: '+e)}}
+async function hueDiscover(){
+  try{const j=await post('/api/hue/discover');$('hue_ip').value=j.ip;toast('found '+j.ip)}
+  catch(e){toast('no bridge found')}}
+async function huePair(){
+  try{await post('/api/hue/pair',{ip:$('hue_ip').value,group:+$('hue_group').value});
+    toast('paired ✓');refresh()}
+  catch(e){toast('pair failed — press the link button, then retry')}}
+async function saveWifi(){
+  try{await post('/api/settings',{wifi_ssid:$('ssid').value,wifi_pass:$('pass').value,reboot:true});
+    toast('rebooting…')}catch(e){toast('failed: '+e)}}
+function slotTag(s){return s.id?`<b>${s.id}</b> @ ${s.ip||'?'}`:'not seen yet'}
+async function refresh(){
+  try{
+    const s=await(await fetch('/api/status')).json();
+    $('mode').textContent=s.ap_mode?'— setup mode':'· '+s.hostname+'.local';
+    if(document.activeElement.id!=='hue_ip')$('hue_ip').value=s.hue.ip||'';
+    $('hue_state').innerHTML=s.hue.paired?'paired ✓':'not paired';
+    $('heater_tag').innerHTML=slotTag(s.heater);
+    $('plug_tag').innerHTML=slotTag(s.plug);
+    $('ac_tag').innerHTML=slotTag(s.breeze)+(s.breeze_remote?` · remote ${s.breeze_remote}`:'');
+    $('seen').textContent=s.seen.length?('heard on LAN: '+s.seen.map(d=>`${d.name||d.id} (${d.type})`).join(', ')):'listening for Switcher broadcasts…';
+    $('voice').textContent=s.voice?'🎤 Voice active — say "Hi ESP", then a command.':'🎤 Voice disabled in this build (needs ESP32-S3).';
+  }catch(e){}}
+refresh();setInterval(refresh,7000);
+</script>
+</body>
+</html>
