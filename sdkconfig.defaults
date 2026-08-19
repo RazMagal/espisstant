@@ -1,0 +1,19 @@
+# Common defaults for all targets
+CONFIG_PARTITION_TABLE_CUSTOM=y
+CONFIG_PARTITION_TABLE_CUSTOM_FILENAME="partitions.csv"
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
+
+# lwIP: mDNS + SO_REUSEADDR for the discovery listener; enough sockets
+# for httpd + discovery listeners + outbound device connections
+CONFIG_LWIP_SO_REUSE=y
+CONFIG_LWIP_MAX_SOCKETS=16
+
+# HTTP server: allow a few parallel sockets (UI + API)
+CONFIG_HTTPD_MAX_REQ_HDR_LEN=1024
+
+# We talk plain HTTP on the LAN (Hue v1 API is HTTP-only)
+CONFIG_ESP_TLS_INSECURE=y
+CONFIG_ESP_TLS_SKIP_SERVER_CERT_VERIFY=y
+
+# Stack sizes: JSON + HTTP work in several tasks
+CONFIG_ESP_MAIN_TASK_STACK_SIZE=6144
