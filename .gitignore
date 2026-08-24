@@ -7,3 +7,4 @@ managed_components/
 __pycache__/
 *.pyc
 tools/test_bin/
+.playwright-mcp/
